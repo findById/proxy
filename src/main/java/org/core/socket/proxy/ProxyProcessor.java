@@ -77,82 +77,75 @@ public class ProxyProcessor implements ProtocolProcessor, Runnable, CompletionHa
 
 	private void execute() throws Exception {
 		try {
-			System.out.println(">> " + address);
+			clientWrite(session);
+		} finally {
+		}
+	}
 
-			ByteBuffer clientBuffer = session.getBuffer();
-			if (clientBuffer == null) {
-				clientBuffer = ByteBuffer.allocate(0);
+	private void clientWrite(SocketSession session) {
+		System.out.println(">> " + address);
+
+		ByteBuffer clientBuffer = session.getBuffer();
+		if (clientBuffer == null) {
+			clientBuffer = ByteBuffer.allocate(0);
+		}
+		clientBuffer.position(0);
+
+		clientChannel.write(clientBuffer, session, new CompletionHandler<Integer, SocketSession>() {
+			@Override
+			public void completed(Integer result, SocketSession attachment) {
+				try {
+					clientRead(attachment);
+				} catch (Throwable e) {
+				}
 			}
-			clientBuffer.position(0);
-			clientChannel.write(clientBuffer, session, new CompletionHandler<Integer, SocketSession>() {
-				@Override
-				public void completed(Integer result, SocketSession attachment) {
 
+			@Override
+			public void failed(Throwable exc, SocketSession attachment) {
+				exc.printStackTrace();
+			}
+		});
+	}
+
+	private void clientRead(SocketSession session) {
+		System.out.println("<< " + session.getRemoteAddress());
+
+		ByteBuffer byteBuffer = ByteBuffer.allocate(1024 * 10);
+		byteBuffer.position(0);
+		clientChannel.read(byteBuffer, session, new CompletionHandler<Integer, SocketSession>() {
+			@Override
+			public void completed(Integer result, SocketSession attachment) {
+
+				try {
 					if (result < 0) {
+						attachment.close();
 						return;
 					}
 
-//					ProxySession proxySession = new ProxySession(attachment);
-//					System.out.println("Proxy session create: " + proxySession.hashCode());
-//					proxySession.read();
-
-					ByteBuffer byteBuffer = ByteBuffer.allocate(1024 * 10);
+					byteBuffer.flip();
 					byteBuffer.position(0);
-					System.out.println("<< " + session.getRemoteAddress());
-
-					clientChannel.read(byteBuffer, attachment, new CompletionHandler<Integer, SocketSession>() {
-						@Override
-						public void completed(Integer result, SocketSession attachment) {
-
-							try {
-								if (result < 0) {
-									attachment.close();
-									return;
-								}
-
-								byteBuffer.flip();
-								byteBuffer.position(0);
-
-//								StringBuffer sb = new StringBuffer();
-//								for (int i = 0; i < byteBuffer.limit(); i++) {
-//									sb.append(byteBuffer.get(i)).append(" ");
-//								}
-//								System.out.println(sb.toString());
-
-								byteBuffer.position(0);
-								int i = attachment.write(byteBuffer).get();
-								if (i < 0) {
-									return;
-								}
-							} catch (Exception e) {
-							}
-
-							try {
-								byteBuffer.position(0);
-								clientChannel.read(byteBuffer, attachment, this);
-							} catch (Exception e) {
-								// ignore maybe
-							}
-						}
-
-						@Override
-						public void failed(Throwable exc, SocketSession attachment) {
-							// ignore maybe
-							exc.printStackTrace();
-						}
-					});
-
+					attachment.write(byteBuffer).get();
+				} catch (Exception e) {
 				}
 
-				@Override
-				public void failed(Throwable exc, SocketSession attachment) {
-					exc.printStackTrace();
-					attachment.close();
+				try {
+					session.read();
+				} catch (Throwable e) {
 				}
-			});
 
-		} finally {
-		}
+				try {
+					byteBuffer.position(0);
+					clientChannel.read(byteBuffer, attachment, this);
+				} catch (Exception e) {
+					// ignore maybe
+				}
+			}
+
+			@Override
+			public void failed(Throwable exc, SocketSession attachment) {
+				// ignore maybe
+			}
+		});
 	}
 
 	public SocketStatus getStatus() {
@@ -163,12 +156,12 @@ public class ProxyProcessor implements ProtocolProcessor, Runnable, CompletionHa
 		this.status = status;
 	}
 
-	public void setRemoteAddress(InetSocketAddress inetSocketAddress) {
-		this.address = inetSocketAddress;
+	public void setRemoteAddress(InetSocketAddress address) {
+		this.address = address;
 	}
 
-	public void setClientChannel(AsynchronousSocketChannel client) {
-		this.clientChannel = client;
+	public void setClientChannel(AsynchronousSocketChannel clientChannel) {
+		this.clientChannel = clientChannel;
 	}
 
 }
