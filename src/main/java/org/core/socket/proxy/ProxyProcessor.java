@@ -87,22 +87,28 @@ public class ProxyProcessor implements ProtocolProcessor, Runnable, CompletionHa
 
 		ByteBuffer clientBuffer = session.getBuffer();
 		if (clientBuffer == null) {
-			clientBuffer = ByteBuffer.allocate(0);
+			return;
 		}
 		clientBuffer.position(0);
 
 		clientChannel.write(clientBuffer, session, new CompletionHandler<Integer, SocketSession>() {
 			@Override
 			public void completed(Integer result, SocketSession attachment) {
+
+				if (result < 0) {
+					return;
+				}
+
 				try {
 					clientRead(attachment);
 				} catch (Throwable e) {
+				} finally {
+					session.read();
 				}
 			}
 
 			@Override
 			public void failed(Throwable exc, SocketSession attachment) {
-				exc.printStackTrace();
 			}
 		});
 	}
@@ -117,7 +123,7 @@ public class ProxyProcessor implements ProtocolProcessor, Runnable, CompletionHa
 			public void completed(Integer result, SocketSession attachment) {
 
 				try {
-					if (result < 0) {
+					if (result <= 0) {
 						attachment.close();
 						return;
 					}
@@ -125,25 +131,22 @@ public class ProxyProcessor implements ProtocolProcessor, Runnable, CompletionHa
 					byteBuffer.flip();
 					byteBuffer.position(0);
 					attachment.write(byteBuffer).get();
+
+					try {
+						byteBuffer.position(0);
+						clientChannel.read(byteBuffer, attachment, this);
+					} catch (Exception e) {
+						attachment.close();
+					}
 				} catch (Exception e) {
+					attachment.close();
 				}
 
-				try {
-					session.read();
-				} catch (Throwable e) {
-				}
-
-				try {
-					byteBuffer.position(0);
-					clientChannel.read(byteBuffer, attachment, this);
-				} catch (Exception e) {
-					// ignore maybe
-				}
 			}
 
 			@Override
 			public void failed(Throwable exc, SocketSession attachment) {
-				// ignore maybe
+				attachment.close();
 			}
 		});
 	}
