@@ -113,11 +113,11 @@ public class ProxyProcessor implements ProtocolProcessor, Runnable, CompletionHa
 								byteBuffer.flip();
 								byteBuffer.position(0);
 
-								StringBuffer sb = new StringBuffer();
-								for (int i = 0; i < byteBuffer.limit(); i++) {
-									sb.append(byteBuffer.get(i)).append(" ");
-								}
-								System.out.println(sb.toString());
+//								StringBuffer sb = new StringBuffer();
+//								for (int i = 0; i < byteBuffer.limit(); i++) {
+//									sb.append(byteBuffer.get(i)).append(" ");
+//								}
+//								System.out.println(sb.toString());
 
 								byteBuffer.position(0);
 								int i = attachment.write(byteBuffer).get();
@@ -125,7 +125,6 @@ public class ProxyProcessor implements ProtocolProcessor, Runnable, CompletionHa
 									return;
 								}
 							} catch (Exception e) {
-								attachment.close();
 							}
 
 							try {
